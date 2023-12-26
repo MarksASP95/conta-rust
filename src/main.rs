@@ -1,8 +1,9 @@
+use anyhow::Context;
 use jsonwebtoken::{ Header, Algorithm, EncodingKey, encode };
 use serde::{ Serialize, Deserialize };
 use chrono;
-use securestore::{KeySource, SecretsManager};
-use std::path::Path;
+use securestore::{ KeySource, SecretsManager };
+use std::{path::Path};
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Claims {
@@ -24,15 +25,29 @@ struct AccessTokenResponseBody {
     expires_in: i16,
 }
 
+fn get_service_account_email_var() -> Result<String, anyhow::Error> {
+    let key_path = Path::new("secrets.key");
+    let sman = SecretsManager::load("secrets.json", KeySource::Path(key_path)).with_context(||
+        format!("could not read secrets file")
+    )?;
+    let service_account_email: String = sman.get("service_account_email").with_context(||
+        format!("service_account_email variable was not found")
+    )?;
+
+    Ok(service_account_email)
+}
+
+
 const SCOPE_CLAIM: &str = "https://www.googleapis.com/auth/drive.file";
 const TOKEN_REQ_URL: &str = "https://oauth2.googleapis.com/token";
 const GRANT_TYPE: &str = "urn:ietf:params:oauth:grant-type:jwt-bearer";
 #[tokio::main]
-async fn main() {
-    let key_path = Path::new("secrets.key");
-    let sman = SecretsManager::load("secrets.json", KeySource::Path(key_path)).unwrap();
-    let service_account_email: String = sman.get("service_account_email").unwrap();
+async fn main() -> Result<(), anyhow::Error> {
 
+    let service_account_email = match get_service_account_email_var() {
+        Ok(email) => { email },
+        Err(err) => { panic!("{:?}", err); }
+    };
     let key = EncodingKey::from_rsa_pem(include_bytes!("private_key")).unwrap();
 
     let current_time_secs = chrono::offset::Local::now().timestamp_millis() / 1000;
@@ -66,4 +81,6 @@ async fn main() {
         .unwrap();
 
     println!("{:?}", res);
+
+    Ok(())
 }
