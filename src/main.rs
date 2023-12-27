@@ -50,6 +50,13 @@ struct EntryInput {
     #[serde(rename(serialize = "devMode"))]
     dev_mode: bool,
 }
+
+#[derive(Debug, Deserialize)]
+struct EntryResponse {
+    success: bool,
+    message: Option<String>,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 struct AccessTokenStore {
     token: String,
@@ -62,7 +69,7 @@ const GRANT_TYPE: &str = "urn:ietf:params:oauth:grant-type:jwt-bearer";
 const CACHE_FILE_PATH: &str = "access_token.json";
 
 fn conta_log(content: &str) {
-    println!("conta: {}", content);
+    println!(">> conta: {}", content);
 }
 
 fn save_token(token: &str, expires_at: i64) -> Result<(), anyhow::Error> {
@@ -155,7 +162,7 @@ async fn main() -> Result<(), anyhow::Error> {
             amount_usd: Some("24,20".to_owned()),
             amount_bs: None,
             date: "27-12-2023".to_owned(),
-            description: "Test from Rust".to_owned(),
+            description: "Another Test from Rust".to_owned(),
             form: "banesco".to_owned(),
             rate: None,
             tag: "varios".to_owned(),
@@ -171,10 +178,14 @@ async fn main() -> Result<(), anyhow::Error> {
         .json(&entry)
         .send().await
         .unwrap()
-        .text().await
+        .json::<EntryResponse>().await
         .unwrap();
 
-    println!("Response: {}", add_entry_res);
+    if add_entry_res.success {
+        conta_log("Entry saved!");
+    } else {
+        conta_log(format!("addEntry -> {}", add_entry_res.message.expect("NO MESSAGE")).as_str());
+    }
 
     Ok(())
 }
