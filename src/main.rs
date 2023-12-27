@@ -1,6 +1,5 @@
-
 use jsonwebtoken::{ Header, Algorithm, EncodingKey, encode };
-use secrets::{ADD_ENTRY_FN_URL, SERVICE_ACCOUNT_EMAIL, SPREADSHEET_ID};
+use secrets::{ ADD_ENTRY_FN_URL, SERVICE_ACCOUNT_EMAIL, SPREADSHEET_ID };
 use serde::{ Serialize, Deserialize };
 use chrono;
 use std::fs;
@@ -83,13 +82,13 @@ async fn get_access_token() -> Result<String, anyhow::Error> {
     if Path::new(&CACHE_FILE_PATH).exists() {
         let contents = fs::read_to_string(&CACHE_FILE_PATH).expect("Unable to read file");
         let store = match serde_json::from_str::<AccessTokenStore>(&contents) {
-            Ok(store) => { store },
+            Ok(store) => { store }
             Err(_) => {
                 conta_log("warning: token cache is malformed. ignoring");
                 AccessTokenStore { token: "".to_owned(), expires_at: 0 }
             }
         };
-        
+
         let current_time_secs = chrono::offset::Local::now().timestamp_millis() / 1000;
         if current_time_secs < store.expires_at {
             conta_log("token recovered from cache");
