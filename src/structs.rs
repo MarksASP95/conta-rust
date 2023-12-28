@@ -36,12 +36,12 @@ pub struct EntryPayload {
 }
 
 #[derive(Debug, Serialize)]
-pub struct EntryInput {
+pub struct EntriesInput<'a> {
     #[serde(rename(serialize = "sprId"))]
     pub spr_id: String,
     #[serde(rename(serialize = "sheetName"))]
     pub sheet_name: String,
-    pub data: EntryPayload,
+    pub entries: &'a Vec<EntryPayload>,
     #[serde(rename(serialize = "devMode"))]
     pub dev_mode: bool,
 }

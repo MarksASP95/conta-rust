@@ -16,6 +16,7 @@ serde = "1.0.193"
 serde_json = "1.0.108"
 sha2 = "0.10.8"
 tokio = { version = "1.35.1", features = ["macros", "rt-multi-thread"] }
+prettytable-rs = "0.10.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
