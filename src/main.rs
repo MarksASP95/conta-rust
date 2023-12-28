@@ -33,7 +33,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 amount_bs = Some(Text::new("Amount Bs").prompt().unwrap());
             }
             if amount_bs.is_some() {
-                rate = Text::new("Rate").with_placeholder("optionals").prompt_skippable().unwrap();
+                rate = Text::new("Rate").with_placeholder("optional").prompt_skippable().unwrap();
                 if rate == Some("".to_owned()) {
                     rate = None;
                 }
