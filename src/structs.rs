@@ -57,3 +57,11 @@ pub struct AccessTokenStore {
     pub token: String,
     pub expires_at: i64,
 }
+
+#[derive(Debug, Deserialize)]
+pub struct RangeValuesResponse {
+    pub range: String,
+    #[serde(rename = "majorDimension")]
+    pub major_dimension: String,
+    pub values: Vec<Vec<String>>,
+}

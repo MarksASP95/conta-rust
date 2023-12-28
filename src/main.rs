@@ -4,14 +4,14 @@ mod structs;
 mod utils;
 
 use inquire::{ Text, Select };
-use chrono::{ self, Datelike };
 use clap::Command;
 use secrets::*;
-use constants::*;
 use structs::*;
-use utils::{ token::get_access_token, log::conta_log };
-#[macro_use] extern crate prettytable;
-use prettytable::Table;
+use utils::{ token::get_access_token, log::conta_log, spreadsheet::get_spreadsheet_read_url };
+#[macro_use]
+extern crate prettytable;
+use prettytable::{ Table, Cell, Row };
+use crate::utils::spreadsheet::*;
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
@@ -19,14 +19,15 @@ async fn main() -> Result<(), anyhow::Error> {
     let cli_matches = Command::new("conta")
         .about("Interact with Contabilidad personal")
         .subcommand_required(true)
-        .subcommand(clap::Command::new("add").about("Add entry"))
+        .subcommand(clap::Command::new("add").about("Add entries"))
+        .subcommand(clap::Command::new("have").about("Check how much money you have"))
         .get_matches();
 
-    let mut keep_adding = true;
-    let mut entries = Vec::<EntryPayload>::new();
-    while keep_adding {
-        let entry: Option<EntryPayload> = match cli_matches.subcommand() {
-            Some(("add", _)) => {
+    match cli_matches.subcommand() {
+        Some(("add", _)) => {
+            let mut entries = Vec::<EntryPayload>::new();
+            let mut keep_adding = true;
+            while keep_adding {
                 let mut amount_usd = Text::new("Amount USD")
                     .with_placeholder("skip for Bs")
                     .prompt_skippable()
@@ -86,7 +87,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 ];
                 let form = Select::new("Form", form_options).prompt().unwrap().to_owned();
 
-                Some(EntryPayload {
+                let entry = Some(EntryPayload {
                     amount_usd,
                     amount_bs,
                     rate,
@@ -94,93 +95,124 @@ async fn main() -> Result<(), anyhow::Error> {
                     description,
                     form,
                     tag,
-                })
+                });
+
+                if entry.is_none() {
+                    panic!("Could not create entry input");
+                }
+
+                entries.push(entry.unwrap());
+
+                println!("---------------------------------------------");
+
+                let add_another_str = Text::new("Add another entry?")
+                    .with_default("y")
+                    .with_placeholder("[Y/n]")
+                    .prompt()
+                    .unwrap()
+                    .to_lowercase();
+
+                println!("---------------------------------------------");
+
+                if add_another_str == "y" {
+                    continue;
+                } else {
+                    keep_adding = false;
+                }
+
+                let entries_input = EntriesInput {
+                    entries: &entries,
+                    dev_mode: false,
+                    spr_id: SPREADSHEET_ID.to_owned(),
+                    sheet_name: get_latest_sheet_name(),
+                };
+
+                let mut table = Table::new();
+
+                table.add_row(
+                    row!["Rate", "AmountBs", "Amount USD", "Description", "Date", "Tag", "Form"]
+                );
+                for entry in &entries {
+                    table.add_row(
+                        row![
+                            entry.rate.clone().unwrap_or("".to_owned()),
+                            entry.amount_bs.clone().unwrap_or("".to_owned()),
+                            entry.amount_usd.clone().unwrap_or("(calculated)".to_owned()),
+                            entry.description,
+                            entry.date,
+                            entry.tag,
+                            entry.form
+                        ]
+                    );
+                }
+
+                table.printstd();
+
+                let confirm = Text::new("Confirm?")
+                    .with_default("y")
+                    .with_placeholder("[Y/n (exit)]")
+                    .prompt()
+                    .unwrap()
+                    .to_lowercase();
+
+                if confirm != "y" {
+                    return Ok(());
+                }
+
+                let access_token = get_access_token().await.unwrap();
+
+                let client = reqwest::Client::new();
+                let add_entry_res = client
+                    .post(ADD_ENTRY_FN_URL)
+                    .header("Authorization", ["Bearer", &access_token].join(" "))
+                    .json(&entries_input)
+                    .send().await
+                    .unwrap()
+                    .json::<EntryResponse>().await
+                    .unwrap();
+
+                if add_entry_res.success {
+                    conta_log("Entry saved!");
+                } else {
+                    conta_log(
+                        format!(
+                            "addEntry -> {}",
+                            add_entry_res.message.expect("NO MESSAGE")
+                        ).as_str()
+                    );
+                }
             }
-            _ => None,
-        };
-
-        if entry.is_none() {
-            panic!("Could not create entry input");
         }
-
-        entries.push(entry.unwrap());
-
-        println!("---------------------------------------------");
-
-        let add_another_str = Text::new("Add another entry?")
-            .with_default("y")
-            .with_placeholder("[Y/n]")
-            .prompt()
-            .unwrap()
-            .to_lowercase();
-
-        println!("---------------------------------------------");
-
-        if add_another_str != "y" {
-            keep_adding = false;
-        }
-    }
-
-    let month_index = today.month0();
-    let year = today.year();
-    let entries_input = EntriesInput {
-        entries: &entries,
-        dev_mode: false,
-        spr_id: SPREADSHEET_ID.to_owned(),
-        sheet_name: [
-            MONTHS.get(month_index as usize)
+        Some(("have", _)) => {
+            let client = reqwest::Client::new();
+            let access_token = get_access_token().await.unwrap();
+            let range = format!("{}!R9:U10", &get_latest_sheet_name());
+            let have_res = client
+                .get(get_spreadsheet_read_url(SPREADSHEET_ID, &range))
+                .header("Authorization", ["Bearer", &access_token].join(" "))
+                .send().await
                 .unwrap()
-                .to_string(),
-            year.to_string(),
-        ].join(" "),
-    };
+                .json::<RangeValuesResponse>().await
+                .unwrap();
 
-    // Create the table
-    let mut table = Table::new();
+            let mut table = Table::new();
 
-    // Add a row per time
-    table.add_row(row!["Rate", "AmountBs", "Amount USD", "Description", "Date", "Tag", "Form"]);
-    for entry in &entries {
-        table.add_row(row![
-            entry.rate.clone().unwrap_or("".to_owned()), 
-            entry.amount_bs.clone().unwrap_or("".to_owned()), 
-            entry.amount_usd.clone().unwrap_or("(calculated)".to_owned()),
-            entry.description,
-            entry.date,
-            entry.tag,
-            entry.form,
-        ]);
-    }
+            let header_cells = have_res.values[0]
+                .iter()
+                .map(|text| Cell::new(&text))
+                .collect();
 
-    table.printstd();
+            let amounts_cells = have_res.values[1]
+                .iter()
+                .map(|text| Cell::new(&text))
+                .collect();
+            
+            table.add_row(Row::new(header_cells));
+            table.add_row(Row::new(amounts_cells));
 
-    let confirm = Text::new("Confirm?")
-        .with_default("y")
-        .with_placeholder("[Y/n (exit)]")
-        .prompt()
-        .unwrap()
-        .to_lowercase();
-
-    if confirm != "y" {
-        return Ok(());
-    }
-
-    let access_token = get_access_token().await.unwrap();
-
-    let client = reqwest::Client::new();
-    let add_entry_res = client
-        .post(ADD_ENTRY_FN_URL)
-        .header("Authorization", ["Bearer", &access_token].join(" "))
-        .json(&entries_input)
-        .send().await
-        .unwrap()
-        .json::<EntryResponse>().await
-        .unwrap();
-
-    if add_entry_res.success {
-        conta_log("Entry saved!");
-    } else {
-        conta_log(format!("addEntry -> {}", add_entry_res.message.expect("NO MESSAGE")).as_str());
+            table.printstd();
+        }
+        _ => (),
     }
 
     Ok(())
