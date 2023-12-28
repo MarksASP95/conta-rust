@@ -1,7 +1,5 @@
 /target
 private_key
 personal
-secrets.key
-secrets.json
 access_token.json
 secrets.rs
