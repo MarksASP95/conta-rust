@@ -2,4 +2,4 @@
 private_key
 personal
 access_token.json
-secrets.rs
+secrets*.rs
