@@ -1,12 +1,8 @@
 use crate::{
-    secrets::{ SPREADSHEETS_BASE_URL, FNS_WEB_APP_BASE_URL, FN_GET_STATUS, FN_ADD_ENTRIES },
+    secrets::{ FNS_WEB_APP_BASE_URL, FN_GET_STATUS, FN_ADD_ENTRIES },
     constants::MONTHS,
 };
 use chrono::{ self, Datelike };
-
-pub fn get_spreadsheet_read_url(spr_id: &str, range: &str) -> String {
-    return format!("{}/{}/values/{}", SPREADSHEETS_BASE_URL, spr_id, range);
-}
 
 pub fn get_latest_sheet_name() -> String {
     let today = chrono::offset::Local::now();
