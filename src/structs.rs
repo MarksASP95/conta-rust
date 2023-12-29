@@ -65,3 +65,24 @@ pub struct RangeValuesResponse {
     pub major_dimension: String,
     pub values: Vec<Vec<String>>,
 }
+
+#[derive(Debug, Serialize)]
+pub struct ContaStatusInput {
+    #[serde(rename(serialize = "sprId"))]
+    pub spr_id: String,
+    #[serde(rename(serialize = "sheetName"))]
+    pub sheet_name: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ContaStatusPayload {
+    pub general: Vec<Vec<String>>,
+    pub distribution: Vec<Vec<String>>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ContaStatusResponse {
+    pub success: bool,
+    pub message: Option<String>,
+    pub data: ContaStatusPayload,
+}

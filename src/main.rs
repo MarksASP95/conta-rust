@@ -7,7 +7,7 @@ use inquire::{ Text, Select };
 use clap::Command;
 use secrets::*;
 use structs::*;
-use utils::{ token::get_access_token, log::conta_log, spreadsheet::get_spreadsheet_read_url };
+use utils::{ token::get_access_token, log::conta_log };
 #[macro_use]
 extern crate prettytable;
 use prettytable::{ Table, Cell, Row };
@@ -20,7 +20,7 @@ async fn main() -> Result<(), anyhow::Error> {
         .about("Interact with Contabilidad personal")
         .subcommand_required(true)
         .subcommand(clap::Command::new("add").about("Add entries"))
-        .subcommand(clap::Command::new("have").about("Check how much money you have"))
+        .subcommand(clap::Command::new("status").about("Check how much money you have"))
         .get_matches();
 
     match cli_matches.subcommand() {
@@ -183,34 +183,57 @@ async fn main() -> Result<(), anyhow::Error> {
                 }
             }
         }
-        Some(("have", _)) => {
+        Some(("status", _)) => {
             let client = reqwest::Client::new();
             let access_token = get_access_token().await.unwrap();
-            let range = format!("{}!R9:U10", &get_latest_sheet_name());
-            let have_res = client
-                .get(get_spreadsheet_read_url(SPREADSHEET_ID, &range))
+            let input = ContaStatusInput {
+                sheet_name: get_latest_sheet_name(),
+                spr_id: SPREADSHEET_ID.to_owned(),
+            };
+            let status_res = client
+                .post(get_fn_url(ContaFunctionName::GetStatus))
+                .json(&input)
                 .header("Authorization", ["Bearer", &access_token].join(" "))
                 .send().await
                 .unwrap()
-                .json::<RangeValuesResponse>().await
+                .json::<ContaStatusResponse>().await
                 .unwrap();
 
-            let mut table = Table::new();
+            let mut general_table = Table::new();
+            {
+                let header_cells = status_res.data.general[0]
+                    .iter()
+                    .map(|text| Cell::new(&text))
+                    .collect();
 
-            let header_cells = have_res.values[0]
-                .iter()
-                .map(|text| Cell::new(&text))
-                .collect();
+                let amounts_cells = status_res.data.general[1]
+                    .iter()
+                    .map(|text| Cell::new(&text))
+                    .collect();
+                general_table.add_row(Row::new(header_cells));
+                general_table.add_row(Row::new(amounts_cells));
+            }
 
-            let amounts_cells = have_res.values[1]
-                .iter()
-                .map(|text| Cell::new(&text))
-                .collect();
-            
-            table.add_row(Row::new(header_cells));
-            table.add_row(Row::new(amounts_cells));
+            let mut distribution_table = Table::new();
+            {
+                let header_cells = status_res.data.distribution[0]
+                    .iter()
+                    .map(|text| Cell::new(&text))
+                    .collect();
 
-            table.printstd();
+                let amounts_cells = status_res.data.distribution[1]
+                    .iter()
+                    .map(|text| Cell::new(&text))
+                    .collect();
+                distribution_table.add_row(Row::new(header_cells));
+                distribution_table.add_row(Row::new(amounts_cells));
+            }
+
+            println!("\nGENERAL");
+            general_table.printstd();
+
+            println!("\nDISTRIBUTION");
+            distribution_table.printstd();
         }
         _ => (),
     }
