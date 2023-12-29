@@ -163,7 +163,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
                 let client = reqwest::Client::new();
                 let add_entry_res = client
-                    .post(ADD_ENTRY_FN_URL)
+                    .post(get_fn_url(ContaFunctionName::AddEntries))
                     .header("Authorization", ["Bearer", &access_token].join(" "))
                     .json(&entries_input)
                     .send().await
