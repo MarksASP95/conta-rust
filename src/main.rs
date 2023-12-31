@@ -106,8 +106,8 @@ async fn main() -> Result<(), anyhow::Error> {
                 println!("---------------------------------------------");
 
                 let add_another_str = Text::new("Add another entry?")
-                    .with_default("y")
-                    .with_placeholder("[Y/n]")
+                    .with_default("n")
+                    .with_placeholder("[y/N]")
                     .prompt()
                     .unwrap()
                     .to_lowercase();
