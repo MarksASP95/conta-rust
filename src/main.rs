@@ -69,6 +69,7 @@ async fn main() -> Result<(), anyhow::Error> {
                     "estacionamiento",
                     "emergencia",
                     "farmacia",
+                    "medico",
                     "misha",
                     "odalys",
                     "varios",
