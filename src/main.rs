@@ -79,12 +79,15 @@ async fn main() -> Result<(), anyhow::Error> {
 
                 let form_options: Vec<&str> = vec![
                     "banesco",
+                    "bofa",
                     "cash",
+                    "euro",
                     "keep",
                     "luismi",
                     "oficina",
                     "paypal",
-                    "ulises"
+                    "ulises",
+                    "wise"
                 ];
                 let form = Select::new("Form", form_options).prompt().unwrap().to_owned();
 
